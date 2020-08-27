@@ -1,0 +1,6 @@
+{
+    "id": "cosmosemulator",
+    "version": "1.0.0",
+    "name": "cosmosemulator",
+    "description": "CosmosDB emulator for Linux"
+}
