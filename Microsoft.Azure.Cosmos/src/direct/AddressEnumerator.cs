@@ -279,37 +279,6 @@ namespace Microsoft.Azure.Documents
             }
         }
 
-        // TODO: Make it IEnumerable
-        private struct TransportAddressIterator : IDisposable
-        {
-            private readonly TransportAddressUri[] replicas;
-            private readonly int index;
-
-            public TransportAddressIterator(int size)
-            {
-                this.replicas = ArrayPool<TransportAddressUri>.Shared.Rent(size);
-                this.index = 0;
-            }
-
-            public void Add(TransportAddressUri newAddress)
-            {
-                this.replicas[this.index] = newAddress;
-            }
-
-            public IEnumerable<TransportAddressUri> Enum()
-            {
-                for (int i = 0; i < this.index; i++)
-                {
-                    yield return this.replicas[i];
-                }
-            }
-
-            public void Dispose()
-            {
-                ArrayPool<TransportAddressUri>.Shared.Return(this.replicas, clearArray: this.index != 0);
-            }
-        }
-
         /// <summary>
         /// When replica address validation is disabled, the address enumerator will transition away Unknown/UnhealthyPending
         /// replicas and pick the replicas by preferring any of the Connected/Unknown/UnhealthyPending over Unhealthy. Therefore
@@ -364,6 +333,37 @@ namespace Microsoft.Azure.Documents
             }
 
             return addressUri.GetEffectiveHealthStatus();
+        }
+
+        // TODO: Make it IEnumerable
+        private struct TransportAddressIterator : IDisposable
+        {
+            private readonly TransportAddressUri[] replicas;
+            private readonly int index;
+
+            public TransportAddressIterator(int size)
+            {
+                this.replicas = ArrayPool<TransportAddressUri>.Shared.Rent(size);
+                this.index = 0;
+            }
+
+            public void Add(TransportAddressUri newAddress)
+            {
+                this.replicas[this.index] = newAddress;
+            }
+
+            public IEnumerable<TransportAddressUri> Enum()
+            {
+                for (int i = 0; i < this.index; i++)
+                {
+                    yield return this.replicas[i];
+                }
+            }
+
+            public void Dispose()
+            {
+                ArrayPool<TransportAddressUri>.Shared.Return(this.replicas, clearArray: this.index != 0);
+            }
         }
     }
 }
