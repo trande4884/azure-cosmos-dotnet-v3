@@ -4,6 +4,7 @@
 namespace Microsoft.Azure.Documents
 {
     using System;
+    using System.Buffers;
     using System.Collections.Generic;
     using System.Linq;
     using static Microsoft.Azure.Documents.HttpConstants;
@@ -243,7 +244,9 @@ namespace Microsoft.Azure.Documents
             IEnumerable<TransportAddressUri> addresses,
             HashSet<TransportAddressUri> failedReplicasPerRequest)
         {
-            List<TransportAddressUri> failedReplicas = null, pendingReplicas = null;
+            using TransportAddressIterator failedReplicas = new TransportAddressIterator(4);
+            using TransportAddressIterator pendingReplicas = new TransportAddressIterator(4);
+
             foreach(TransportAddressUri transportAddressUri in addresses)
             {
                 TransportAddressHealthState.HealthStatus status = AddressEnumerator.GetEffectiveStatus(
@@ -257,30 +260,53 @@ namespace Microsoft.Azure.Documents
                 }
                 else if (status == TransportAddressHealthState.HealthStatus.UnhealthyPending)
                 {
-                    pendingReplicas ??= new ();
                     pendingReplicas.Add(transportAddressUri);
                 }
                 else
                 {
-                    failedReplicas ??= new ();
                     failedReplicas.Add(transportAddressUri);
                 }
             }
 
-            if (pendingReplicas != null)
+            foreach (TransportAddressUri transportAddressUri in pendingReplicas.Enum())
             {
-                foreach (TransportAddressUri transportAddressUri in pendingReplicas)
+                yield return transportAddressUri;
+            }
+
+            foreach (TransportAddressUri transportAddressUri in failedReplicas.Enum())
+            {
+                yield return transportAddressUri;
+            }
+        }
+
+        // TODO: Make it IEnumerable
+        private struct TransportAddressIterator : IDisposable
+        {
+            private readonly TransportAddressUri[] replicas;
+            private readonly int index;
+
+            public TransportAddressIterator(int size)
+            {
+                this.replicas = ArrayPool<TransportAddressUri>.Shared.Rent(size);
+                this.index = 0;
+            }
+
+            public void Add(TransportAddressUri newAddress)
+            {
+                this.replicas[this.index] = newAddress;
+            }
+
+            public IEnumerable<TransportAddressUri> Enum()
+            {
+                for (int i = 0; i < this.index; i++)
                 {
-                    yield return transportAddressUri;
+                    yield return this.replicas[i];
                 }
             }
 
-            if(failedReplicas != null)
+            public void Dispose()
             {
-                foreach (TransportAddressUri transportAddressUri in failedReplicas)
-                {
-                    yield return transportAddressUri;
-                }
+                ArrayPool<TransportAddressUri>.Shared.Return(this.replicas, clearArray: this.index != 0);
             }
         }
 
@@ -296,7 +322,8 @@ namespace Microsoft.Azure.Documents
             IEnumerable<TransportAddressUri> addresses,
             HashSet<TransportAddressUri> failedReplicasPerRequest)
         {
-            List<TransportAddressUri> failedReplicas = null;
+            using TransportAddressIterator failedReplicas = new TransportAddressIterator(4);
+
             foreach (TransportAddressUri transportAddressUri in addresses)
             {
                 TransportAddressHealthState.HealthStatus status = AddressEnumerator.GetEffectiveStatus(
@@ -311,17 +338,13 @@ namespace Microsoft.Azure.Documents
                 }
                 else
                 {
-                    failedReplicas ??= new ();
                     failedReplicas.Add(transportAddressUri);
                 }
             }
 
-            if (failedReplicas != null)
+            foreach (TransportAddressUri transportAddressUri in failedReplicas.Enum())
             {
-                foreach (TransportAddressUri transportAddressUri in failedReplicas)
-                {
-                    yield return transportAddressUri;
-                }
+                yield return transportAddressUri;
             }
         }
 
