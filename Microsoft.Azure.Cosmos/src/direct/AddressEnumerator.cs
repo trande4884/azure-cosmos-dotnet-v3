@@ -244,38 +244,48 @@ namespace Microsoft.Azure.Documents
             IEnumerable<TransportAddressUri> addresses,
             HashSet<TransportAddressUri> failedReplicasPerRequest)
         {
-            using TransportAddressIterator failedReplicas = new TransportAddressIterator(4);
-            using TransportAddressIterator pendingReplicas = new TransportAddressIterator(4);
+            TransportAddressIterator failedReplicas = null;
+            TransportAddressIterator pendingReplicas = null;
 
-            foreach(TransportAddressUri transportAddressUri in addresses)
+            try
             {
-                TransportAddressHealthState.HealthStatus status = AddressEnumerator.GetEffectiveStatus(
-                    addressUri: transportAddressUri,
-                    failedEndpoints: failedReplicasPerRequest);
+                foreach (TransportAddressUri transportAddressUri in addresses)
+                {
+                    TransportAddressHealthState.HealthStatus status = AddressEnumerator.GetEffectiveStatus(
+                        addressUri: transportAddressUri,
+                        failedEndpoints: failedReplicasPerRequest);
 
-                if (status == TransportAddressHealthState.HealthStatus.Connected ||
-                    status == TransportAddressHealthState.HealthStatus.Unknown)
+                    if (status == TransportAddressHealthState.HealthStatus.Connected ||
+                        status == TransportAddressHealthState.HealthStatus.Unknown)
+                    {
+                        yield return transportAddressUri;
+                    }
+                    else if (status == TransportAddressHealthState.HealthStatus.UnhealthyPending)
+                    {
+                        pendingReplicas ??= new TransportAddressIterator(4);
+                        pendingReplicas.Add(transportAddressUri);
+                    }
+                    else
+                    {
+                        failedReplicas ??= new TransportAddressIterator(4);
+                        failedReplicas.Add(transportAddressUri);
+                    }
+                }
+
+                foreach (TransportAddressUri transportAddressUri in pendingReplicas.Enum())
                 {
                     yield return transportAddressUri;
                 }
-                else if (status == TransportAddressHealthState.HealthStatus.UnhealthyPending)
+
+                foreach (TransportAddressUri transportAddressUri in failedReplicas.Enum())
                 {
-                    pendingReplicas.Add(transportAddressUri);
-                }
-                else
-                {
-                    failedReplicas.Add(transportAddressUri);
+                    yield return transportAddressUri;
                 }
             }
-
-            foreach (TransportAddressUri transportAddressUri in pendingReplicas.Enum())
+            finally
             {
-                yield return transportAddressUri;
-            }
-
-            foreach (TransportAddressUri transportAddressUri in failedReplicas.Enum())
-            {
-                yield return transportAddressUri;
+                failedReplicas?.Dispose();
+                pendingReplicas?.Dispose();
             }
         }
 
@@ -336,7 +346,7 @@ namespace Microsoft.Azure.Documents
         }
 
         // TODO: Make it IEnumerable
-        private struct TransportAddressIterator : IDisposable
+        private class TransportAddressIterator : IDisposable
         {
             private readonly TransportAddressUri[] replicas;
             private readonly int index;
