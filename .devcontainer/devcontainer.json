@@ -4,5 +4,8 @@
         "context": "."
     },
     // Use 'postStartCommand' to run emulator asynchronously.
-    "postStartCommand": "nohup bash -c '/usr/local/bin/cosmos/startemulator.sh &' "
+    "postStartCommand": "nohup bash -c '/usr/local/bin/cosmos/startemulator.sh &' ",
+	"features": {
+		"ghcr.io/devcontainers/features/dotnet:1": {}
+	}    
 }
