@@ -2,5 +2,7 @@
     "build": {
         "dockerfile": "./Dockerfile",
         "context": "."
-    }
+    },
+    // Use 'postStartCommand' to run commands after the container is created.
+    "postStartCommand": "nohup bash -c '/usr/local/bin/cosmos/startemulator.sh &' "
 }
